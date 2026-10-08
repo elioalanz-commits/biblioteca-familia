@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Biblioteca Familiar Steam</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: estante de la familia — cabecera con conteo, dos pestañas (biblioteca tipo hoja / votación de compras) */
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --sunk:#E3E8EE; --line:#CBD3DC;
+  --fg:#16202B; --muted:#5A6878; --accent:#0E7C86; --accent-ink:#FFFFFF;
+  --vote:#C9741A; --vote-soft:#F7E6D2; --ok:#2E7D4F; --ok-soft:#DCEFE3; --warn:#9A5B00; --warn-soft:#FBEBCF;
+  --display:"Chakra Petch",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10161D; --surface:#18212B; --sunk:#202B37; --line:#2D3A48;
+  --fg:#E4EAF0; --muted:#94A3B3; --accent:#3FB8C2; --accent-ink:#06191B;
+  --vote:#E9A04B; --vote-soft:#3A2A17; --ok:#6CC892; --ok-soft:#173226; --warn:#E8B45A; --warn-soft:#3A2C12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10161D; --surface:#18212B; --sunk:#202B37; --line:#2D3A48;
+  --fg:#E4EAF0; --muted:#94A3B3; --accent:#3FB8C2; --accent-ink:#06191B;
+  --vote:#E9A04B; --vote-soft:#3A2A17; --ok:#6CC892; --ok-soft:#173226; --warn:#E8B45A; --warn-soft:#3A2C12; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 16px 64px}
+header h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5vw,40px);line-height:1.05;margin:0;letter-spacing:.01em;text-wrap:balance}
+.stats{display:flex;flex-wrap:wrap;gap:8px 22px;margin:12px 0 0;color:var(--muted);font-family:var(--mono);font-size:13px}
+.stats b{color:var(--fg);font-weight:500;font-variant-numeric:tabular-nums}
+nav.tabs{display:flex;gap:4px;margin:24px 0 20px;border-bottom:1px solid var(--line)}
+nav.tabs button{appearance:none;border:0;background:none;color:var(--muted);font:600 15px var(--body);padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.count{font-family:var(--mono);font-size:12px;background:var(--sunk);color:var(--muted);border-radius:99px;padding:1px 7px;margin-left:6px}
+h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* géneros */
+.genres{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin:10px 0 18px}
+.genre{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:8px 10px;font:500 14px var(--body);cursor:pointer;position:relative;overflow:hidden}
+.genre .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);opacity:.55}
+.genre .n{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.genre[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.genre[aria-pressed="true"] .n{color:var(--accent-ink)}
+.genre[aria-pressed="true"] .bar{background:var(--accent-ink)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.toolbar input[type=search]{flex:1 1 220px;min-width:0}
+input[type=search],input[type=text],select,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.check{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--fg);cursor:pointer;user-select:none}
+.btn{appearance:none;font:600 14px var(--body);border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.small{padding:4px 10px;font-size:13px}
+.shown{font-family:var(--mono);font-size:13px;color:var(--muted);margin:6px 0}
+
+.table-box{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{position:sticky;top:0;background:var(--sunk);text-align:left;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 12px;white-space:nowrap;cursor:pointer;user-select:none}
+th[aria-sort="ascending"]::after{content:" ↑"} th[aria-sort="descending"]::after{content:" ↓"}
+td{padding:7px 12px;border-top:1px solid var(--line);vertical-align:top}
+td.name{font-weight:500;min-width:200px}
+td.muted{color:var(--muted);white-space:nowrap}
+.pill{display:inline-block;font-size:12px;font-weight:600;border-radius:99px;padding:1px 8px;white-space:nowrap}
+.pill.grp{background:var(--ok-soft);color:var(--ok)}
+.pill.own{background:var(--sunk);color:var(--muted)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.genre-p{background:var(--sunk);color:var(--fg);font-weight:500}
+
+/* votación */
+.vote-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+@media (max-width:820px){.vote-grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+form.add{display:grid;gap:10px}
+form.add label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.notice{padding:10px 12px;border-radius:6px;background:var(--warn-soft);color:var(--warn);font-size:14px;margin-bottom:14px}
+.cands{display:grid;gap:8px;margin-top:12px}
+.cand{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.cand.lead{border-color:var(--vote)}
+.rank{font-family:var(--display);font-weight:700;font-size:22px;color:var(--muted);line-height:1.1;text-align:center;font-variant-numeric:tabular-nums}
+.cand.lead .rank{color:var(--vote)}
+.cand h3{margin:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;align-items:center}
+.note{margin:6px 0 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.who{display:flex;align-items:center;gap:4px;margin-top:8px;font-size:12px;color:var(--muted)}
+.who img{width:22px;height:22px;border-radius:50%;border:2px solid var(--surface);margin-left:-6px}
+.who img:first-child{margin-left:0}
+.vote-btn{display:grid;justify-items:center;gap:0;min-width:64px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:6px 8px;cursor:pointer;font:600 12px var(--body)}
+.vote-btn .v{font-family:var(--display);font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.vote-btn[aria-pressed="true"]{background:var(--vote-soft);border-color:var(--vote);color:var(--vote)}
+.vote-btn:disabled{cursor:not-allowed;opacity:.6}
+.actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.linkish{appearance:none;background:none;border:0;padding:0;color:var(--muted);font:500 13px var(--body);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.linkish.danger{color:var(--warn)}
+.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+details.bought summary{cursor:pointer;color:var(--muted);font-weight:600;margin-top:18px}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:14px;z-index:5}
+@media (max-width:520px){.cand{grid-template-columns:28px minmax(0,1fr);}.cand .vote-btn{grid-column:2;justify-self:start;grid-auto-flow:column;gap:8px;align-items:center}}
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px}
+.member{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:10px;align-content:start;min-width:0}
+.member-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.member h3{margin:0;font-family:var(--display);font-size:19px;font-weight:600;overflow-wrap:anywhere}
+.member a{color:var(--accent);font-size:13px}
+.wl{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.wl li{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid var(--line);font-size:14px;min-width:0}
+.wl li:first-child{border-top:0}
+.wl .t{min-width:0;overflow-wrap:anywhere}
+.wl .tags{display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.x{appearance:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;border-radius:4px}
+.x:hover{color:var(--warn)}
+.member textarea{font:inherit;font-size:14px;width:100%;min-height:64px;resize:vertical;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.pill.vot{background:var(--vote-soft);color:var(--vote)}
+.hot-n{font-family:var(--display);font-weight:700;font-size:22px;color:var(--vote);text-align:center;line-height:1.1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Biblioteca Familiar Steam</h1>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-lib" aria-selected="true" aria-controls="pane-lib">Biblioteca</button>
+    <button role="tab" id="tab-vote" aria-selected="false" aria-controls="pane-vote">Votación de compras<span class="count" id="cand-count">0</span></button>
+    <button role="tab" id="tab-mem" aria-selected="false" aria-controls="pane-mem">Integrantes<span class="count" id="mem-count">0</span></button>
+  </nav>
+
+  <section id="pane-lib" role="tabpanel" aria-labelledby="tab-lib">
+    <div class="label">Géneros · toca uno para filtrar</div>
+    <div class="genres" id="genres"></div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Buscar un juego…" aria-label="Buscar un juego">
+      <select id="origin" aria-label="Biblioteca">
+        <option value="">Todas las bibliotecas</option>
+        <option value="Propio">Solo propios</option>
+        <option value="Familia">Solo grupo familiar</option>
+      </select>
+      <label class="check"><input type="checkbox" id="grp"> Para jugar en grupo</label>
+      <button class="btn" id="export-lib" type="button">Descargar para Excel</button>
+    </div>
+    <div class="shown" id="shown"></div>
+    <div class="table-box">
+      <table>
+        <thead><tr>
+          <th data-k="n" aria-sort="ascending">Juego</th>
+          <th data-k="g">Género</th>
+          <th data-k="p">En grupo</th>
+          <th data-k="o">Biblioteca</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="pane-vote" role="tabpanel" aria-labelledby="tab-vote" hidden>
+    <div class="vote-grid">
+      <div style="min-width:0">
+        <div id="vote-notice" class="notice" hidden></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2>Ranking de candidatos</h2>
+          <button class="btn small" id="export-votes" type="button">Descargar para Excel</button>
+        </div>
+        <p class="hint" style="margin-top:4px">Cada persona puede votar por todos los juegos que quiera. El más votado va arriba.</p>
+        <div class="cands" id="cands"><div class="empty">Cargando candidatos…</div></div>
+        <details class="bought" id="bought-box" hidden>
+          <summary>Ya comprados (<span id="bought-n">0</span>)</summary>
+          <div class="cands" id="bought"></div>
+        </details>
+      </div>
+      <aside class="panel">
+        <h2 style="font-size:17px">Proponer un juego</h2>
+        <form class="add" id="who-form" style="margin-top:12px">
+          <label for="f-me">Tu nombre (para contar tu voto)
+            <input type="text" id="f-me" maxlength="40" autocomplete="off" placeholder="Ej. Elio" list="member-names">
+            <datalist id="member-names"></datalist>
+          </label>
+        </form>
+        <form class="add" id="add-form" style="margin-top:16px">
+          <label for="f-name">Nombre del juego
+            <input type="text" id="f-name" required maxlength="120" autocomplete="off" placeholder="Ej. Balatro">
+          </label>
+          <div id="f-dupe" class="pill warn" hidden></div>
+          <label for="f-genre">Género
+            <select id="f-genre"></select>
+          </label>
+          <label class="check" for="f-grp" style="display:flex"><input type="checkbox" id="f-grp"> Se puede jugar en grupo</label>
+          <label for="f-note">Por qué lo quieres (opcional)
+            <input type="text" id="f-note" maxlength="200" autocomplete="off" placeholder="Ej. cooperativo para 4, está en oferta">
+          </label>
+          <button class="btn primary" type="submit" id="f-submit">Agregar a la votación</button>
+          <p class="hint">Antes de comprar, revisa en la tienda que tenga la etiqueta "Family Sharing" para que todos lo puedan usar.</p>
+        </form>
+      </aside>
+    </div>
+  </section>
+
+  <section id="pane-mem" role="tabpanel" aria-labelledby="tab-mem" hidden>
+    <div class="vote-grid">
+      <div style="min-width:0">
+        <div id="mem-notice" class="notice" hidden></div>
+        <h2>Lo que más quiere la familia</h2>
+        <p class="hint" style="margin-top:4px">Juegos que están en la wishlist de dos o más integrantes y que todavía no tienen.</p>
+        <div class="cands" id="hot"></div>
+        <h2 style="margin-top:28px">Integrantes y sus wishlists</h2>
+        <div class="members" id="members"><div class="empty">Cargando integrantes…</div></div>
+      </div>
+      <aside class="panel">
+        <h2 style="font-size:17px">Agregar integrante</h2>
+        <form class="add" id="mem-form" style="margin-top:12px">
+          <label for="m-name">Nombre
+            <input type="text" id="m-name" required maxlength="40" autocomplete="off" placeholder="Ej. Luis">
+          </label>
+          <label for="m-steam">Perfil de Steam (opcional)
+            <input type="text" id="m-steam" maxlength="200" autocomplete="off" placeholder="https://steamcommunity.com/profiles/…">
+          </label>
+          <button class="btn primary" type="submit" id="m-submit">Agregar integrante</button>
+          <p class="hint">Después, en su tarjeta, se pueden pegar los juegos de su wishlist, uno por línea.</p>
+        </form>
+      </aside>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ======================================================================
+   CONFIGURACIÓN DE FIREBASE
+   Pega aquí los datos de tu proyecto (Firebase > Configuración del
+   proyecto > Tus apps > Web). Mientras esté vacío, la biblioteca funciona
+   pero la votación no.
+   ====================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+
+const GAMES = [{"n":"12 is Better Than 6","g":"Shooter","p":0,"o":"Propio"},{"n":"Aimlabs","g":"Indie y otros","p":0,"o":"Propio"},{"n":"Apex Legends","g":"Shooter","p":1,"o":"Propio"},{"n":"Baldur's Gate 3","g":"RPG","p":1,"o":"Propio"},{"n":"Battlefield 1","g":"Shooter","p":1,"o":"Propio"},{"n":"Black Desert","g":"MMO y online","p":1,"o":"Propio"},{"n":"Brawlhalla","g":"Lucha","p":1,"o":"Propio"},{"n":"Breathedge","g":"Supervivencia y crafteo","p":0,"o":"Propio"},{"n":"Call of Duty","g":"Shooter","p":1,"o":"Propio"},{"n":"Canvas of Kings Demo","g":"Indie y otros","p":0,"o":"Propio"},{"n":"Core Keeper","g":"Supervivencia y crafteo","p":1,"o":"Propio"},{"n":"Counter-Strike 2","g":"Shooter","p":1,"o":"Propio"},{"n":"Cult of the Lamb","g":"Roguelike","p":1,"o":"Propio"},{"n":"Deadlock","g":"Shooter","p":1,"o":"Propio"},{"n":"Delta Force","g":"Shooter","p":1,"o":"Propio"},{"n":"Due Process","g":"Shooter","p":1,"o":"Propio"},{"n":"Dungeons & Dragons Online","g":"MMO y online","p":1,"o":"Propio"},{"n":"Far Far West","g":"Shooter","p":1,"o":"Propio"},{"n":"GOALS","g":"Carreras y deportes","p":1,"o":"Propio"},{"n":"Golf With Your Friends","g":"Party y casual","p":1,"o":"Propio"},{"n":"Graveyard Keeper","g":"Tranquilos","p":0,"o":"Propio"},{"n":"Haven & Hearth","g":"MMO y online","p":1,"o":"Propio"},{"n":"Heartopia","g":"Tranquilos","p":1,"o":"Propio"},{"n":"Lethal Company","g":"Terror","p":1,"o":"Propio"},{"n":"Lords of the Fallen","g":"Soulslike","p":1,"o":"Propio"},{"n":"Machine Party","g":"Indie y otros","p":0,"o":"Propio"},{"n":"Marvel Rivals","g":"Shooter","p":1,"o":"Propio"},{"n":"Monster Hunter Rise","g":"Acción y aventura","p":1,"o":"Propio"},{"n":"Moonlighter","g":"Roguelike","p":0,"o":"Propio"},{"n":"One-armed cook","g":"Party y casual","p":1,"o":"Propio"},{"n":"Overwatch","g":"Shooter","p":1,"o":"Propio"},{"n":"Path of Exile","g":"RPG","p":1,"o":"Propio"},{"n":"Path of Exile 2","g":"RPG","p":1,"o":"Propio"},{"n":"PEAK","g":"Party y casual","p":1,"o":"Propio"},{"n":"Spectre Divide","g":"Shooter","p":1,"o":"Propio"},{"n":"Stardew Valley","g":"Tranquilos","p":1,"o":"Propio"},{"n":"STRAFTAT","g":"Shooter","p":1,"o":"Propio"},{"n":"SUPERVIVE","g":"MMO y online","p":1,"o":"Propio"},{"n":"Tabletop Simulator","g":"Party y casual","p":1,"o":"Propio"},{"n":"THE FINALS","g":"Shooter","p":1,"o":"Propio"},{"n":"The Forest","g":"Supervivencia y crafteo","p":1,"o":"Propio"},{"n":"The Sims 4","g":"Simulación","p":0,"o":"Propio"},{"n":"Throne and Liberty","g":"MMO y online","p":1,"o":"Propio"},{"n":"Tom Clancy's Rainbow Six Siege","g":"Shooter","p":1,"o":"Propio"},{"n":"Tom Clancy's Rainbow Six Siege (segunda entrada)","g":"Shooter","p":1,"o":"Propio"},{"n":"ULTRAKILL","g":"Shooter","p":0,"o":"Propio"},{"n":"Unturned","g":"Supervivencia y crafteo","p":1,"o":"Propio"},{"n":"WARDOGS","g":"Shooter","p":1,"o":"Propio"},{"n":"Wuthering Waves","g":"RPG","p":0,"o":"Propio"},{"n":"$1 Ride","g":"Indie y otros","p":0,"o":"Familia"},{"n":"100% Orange Juice","g":"Party y casual","p":1,"o":"Familia"},{"n":"16bit Trader","g":"Indie y otros","p":0,"o":"Familia"},{"n":"911 Operator","g":"Simulación","p":0,"o":"Familia"},{"n":"A grande bagunça espacial","g":"Indie y otros","p":0,"o":"Familia"},{"n":"A Plague Tale: Innocence","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"A Plague Tale: Requiem","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Ace of Words","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"AI: Rampage","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Airscape: The Fall of Gravity","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Alan Wake","g":"Terror","p":0,"o":"Familia"},{"n":"Alan Wake's American Nightmare","g":"Terror","p":0,"o":"Familia"},{"n":"Aliens versus Predator Classic 2000","g":"Shooter","p":0,"o":"Familia"},{"n":"Amnesia: A Machine for Pigs","g":"Terror","p":0,"o":"Familia"},{"n":"Amnesia: Rebirth","g":"Terror","p":0,"o":"Familia"},{"n":"Amnesia: The Bunker","g":"Terror","p":0,"o":"Familia"},{"n":"Amnesia: The Dark Descent","g":"Terror","p":0,"o":"Familia"},{"n":"Anomaly Warzone Earth","g":"Estrategia","p":0,"o":"Familia"},{"n":"Another Crab's Treasure","g":"Soulslike","p":0,"o":"Familia"},{"n":"ARC Raiders","g":"Shooter","p":1,"o":"Familia"},{"n":"Argo","g":"Shooter","p":1,"o":"Familia"},{"n":"ARK: Survival Evolved","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"ARK: Survival Of The Fittest","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Arma 2","g":"Shooter","p":1,"o":"Familia"},{"n":"Arma 2: DayZ Mod","g":"Shooter","p":1,"o":"Familia"},{"n":"Assassin's Creed","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Atomicrops","g":"Roguelike","p":1,"o":"Familia"},{"n":"Atonement: Scourge of Time","g":"RPG","p":0,"o":"Familia"},{"n":"AXYOS","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Back to Bed","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"BALL x PIT","g":"Roguelike","p":0,"o":"Familia"},{"n":"Banishers: Ghosts of New Eden","g":"RPG","p":0,"o":"Familia"},{"n":"Barony","g":"Roguelike","p":1,"o":"Familia"},{"n":"BARRIER X","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Batman - The Telltale Series","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Batman: Arkham Asylum GOTY","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Batman: Arkham City GOTY","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Batman: The Enemy Within","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Battle Ranch","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Battlestar Galactica Deadlock","g":"Estrategia","p":0,"o":"Familia"},{"n":"BEEP","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Berry Bury Berry","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Beyond: Two Souls","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Big Helmet Heroes","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Bionic Dues","g":"Roguelike","p":0,"o":"Familia"},{"n":"BioShock","g":"Shooter","p":0,"o":"Familia"},{"n":"BioShock Remastered","g":"Shooter","p":0,"o":"Familia"},{"n":"BioShock 2","g":"Shooter","p":0,"o":"Familia"},{"n":"BioShock 2 Remastered","g":"Shooter","p":0,"o":"Familia"},{"n":"BioShock Infinite","g":"Shooter","p":0,"o":"Familia"},{"n":"Bit Blaster XL","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Black Desert SA (Retired)","g":"MMO y online","p":1,"o":"Familia"},{"n":"Blair Witch","g":"Terror","p":0,"o":"Familia"},{"n":"Blasphemous","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Blasphemous 2","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Borderlands 2","g":"Shooter","p":1,"o":"Familia"},{"n":"BPM: Bullets Per Minute","g":"Shooter","p":0,"o":"Familia"},{"n":"Bramble: The Mountain King","g":"Terror","p":0,"o":"Familia"},{"n":"Bridge Constructor Portal","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Brilliant Bob","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Broken Dreams","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Brütal Legend","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Buckshot Roulette","g":"Terror","p":1,"o":"Familia"},{"n":"Bully: Scholarship Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Cakey's Twisted Bakery","g":"Terror","p":0,"o":"Familia"},{"n":"Call of Duty: Black Ops III","g":"Shooter","p":1,"o":"Familia"},{"n":"Call of Juarez Gunslinger","g":"Shooter","p":0,"o":"Familia"},{"n":"Car Mechanic Simulator 2018","g":"Simulación","p":0,"o":"Familia"},{"n":"Caribbean Crashers","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Castle Break","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Castle Crashers","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Catch Me!","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Celeste","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Chivalry: Medieval Warfare","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"City of Chains","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Clair Obscur: Expedition 33","g":"RPG","p":0,"o":"Familia"},{"n":"Cloud Knights","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Commander: Conquest of the Americas","g":"Estrategia","p":0,"o":"Familia"},{"n":"Company of Heroes 2","g":"Estrategia","p":1,"o":"Familia"},{"n":"CONSORTIUM 2014","g":"Indie y otros","p":0,"o":"Familia"},{"n":"CONSORTIUM Remastered","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Constance","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Contagion","g":"Terror","p":1,"o":"Familia"},{"n":"Content Warning","g":"Terror","p":1,"o":"Familia"},{"n":"Control Ultimate Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Cosmic Dust & Rust","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Crimson Desert Enhanced","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"CRYPTARK","g":"Roguelike","p":0,"o":"Familia"},{"n":"Crystal Crisis","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Crystals of Time","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Cubetractor","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Cuphead","g":"Plataformas y metroidvania","p":1,"o":"Familia"},{"n":"Cyberpunk 2077","g":"RPG","p":0,"o":"Familia"},{"n":"Dark Sector","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Dark Souls: Prepare To Die Edition","g":"Soulslike","p":0,"o":"Familia"},{"n":"Dark Souls II: Scholar of the First Sin","g":"Soulslike","p":0,"o":"Familia"},{"n":"Dark Souls III","g":"Soulslike","p":0,"o":"Familia"},{"n":"Dark Souls: Remastered","g":"Soulslike","p":0,"o":"Familia"},{"n":"Darkest Dungeon","g":"Roguelike","p":0,"o":"Familia"},{"n":"Darksiders","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Darksiders II Deathinitive Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Darksiders III","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Darksiders Warmastered Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Darkwood","g":"Terror","p":0,"o":"Familia"},{"n":"Data Hacker: Corruption","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Data Hacker: Initiation","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Data Hacker: Reboot","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Dave the Diver","g":"Tranquilos","p":0,"o":"Familia"},{"n":"Days Gone","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Dead Bits","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Dead by Daylight","g":"Terror","p":1,"o":"Familia"},{"n":"Dead Cells","g":"Roguelike","p":0,"o":"Familia"},{"n":"Dead Island Definitive Edition","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Dead Rising","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Dead6hot","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Deadbreed","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Deadly Profits","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Death Stranding Director's Cut","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Death's Door","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Deep Rock Galactic","g":"Shooter","p":1,"o":"Familia"},{"n":"Deponia","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Desktop Dungeons","g":"Roguelike","p":0,"o":"Familia"},{"n":"Destiny Warriors","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Detroit: Become Human","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Devil May Cry 4 Special Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Devil May Cry 5","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Devil May Cry HD Collection","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Dinkum","g":"Tranquilos","p":1,"o":"Familia"},{"n":"DiRT 3 Complete Edition","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"DiRT Showdown","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Disco Elysium","g":"RPG","p":0,"o":"Familia"},{"n":"Dishonored","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Dokimon","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Don't Starve","g":"Supervivencia y crafteo","p":0,"o":"Familia"},{"n":"Don't Starve Together","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"DOOM","g":"Shooter","p":0,"o":"Familia"},{"n":"Dragon Ball Xenoverse","g":"Lucha","p":1,"o":"Familia"},{"n":"Dragon Ball Xenoverse 2","g":"Lucha","p":1,"o":"Familia"},{"n":"Dragon's Dogma: Dark Arisen","g":"RPG","p":0,"o":"Familia"},{"n":"Drawful 2","g":"Party y casual","p":1,"o":"Familia"},{"n":"Dreams of Aether","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Dreams with Furry","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Drift Streets Japan","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Drones, The Human Condition","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Dungeon of the ENDLESS","g":"Roguelike","p":1,"o":"Familia"},{"n":"Dungeon of Zolthan","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Dying Light","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Earth 2150: The Moon Project","g":"Estrategia","p":0,"o":"Familia"},{"n":"Earth 2160","g":"Estrategia","p":0,"o":"Familia"},{"n":"ELDEN RING","g":"Soulslike","p":0,"o":"Familia"},{"n":"ELDEN RING NIGHTREIGN","g":"Soulslike","p":1,"o":"Familia"},{"n":"Eldest Souls","g":"Soulslike","p":0,"o":"Familia"},{"n":"Elements II: Hearts of Light","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Elements: Soul of Fire","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Elite Dangerous: Arena","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Enclave","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"ENDER MAGNOLIA: Bloom in the Mist","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"ENDLESS Legend","g":"Estrategia","p":0,"o":"Familia"},{"n":"Endorlight","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Enemy Mind","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Enshrouded","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Enter the Gungeon","g":"Roguelike","p":1,"o":"Familia"},{"n":"Escape the Backrooms","g":"Terror","p":1,"o":"Familia"},{"n":"El Escudero Valiente","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Euro Truck Simulator 2","g":"Simulación","p":0,"o":"Familia"},{"n":"Evil Genius","g":"Estrategia","p":0,"o":"Familia"},{"n":"F1 2015","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Fallout","g":"RPG","p":0,"o":"Familia"},{"n":"Fallout 2","g":"RPG","p":0,"o":"Familia"},{"n":"Fallout 3 - Game of the Year Edition","g":"RPG","p":0,"o":"Familia"},{"n":"Fallout 4","g":"RPG","p":0,"o":"Familia"},{"n":"Fallout: New Vegas","g":"RPG","p":0,"o":"Familia"},{"n":"Fantasy General II","g":"Estrategia","p":0,"o":"Familia"},{"n":"Fear Therapy","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Fellowship","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Field of Glory II: Medieval","g":"Estrategia","p":0,"o":"Familia"},{"n":"Fields of Mistria","g":"Tranquilos","p":0,"o":"Familia"},{"n":"Figment","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Final Fantasy VII","g":"RPG","p":0,"o":"Familia"},{"n":"Final Fantasy VII (2013)","g":"RPG","p":0,"o":"Familia"},{"n":"Final Fantasy VII Remake Intergrade","g":"RPG","p":0,"o":"Familia"},{"n":"Final Fantasy XV Windows Edition","g":"RPG","p":0,"o":"Familia"},{"n":"Final Fantasy XVI","g":"RPG","p":0,"o":"Familia"},{"n":"Flesh Eaters","g":"Indie y otros","p":0,"o":"Familia"},{"n":"FlyKnight Enhanced Edition","g":"Indie y otros","p":0,"o":"Familia"},{"n":"For Honor - Public Test","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Fort Defense","g":"Estrategia","p":0,"o":"Familia"},{"n":"Frostpunk","g":"Estrategia","p":0,"o":"Familia"},{"n":"GabeN: The Final Decision","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Galactic Hitman","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Garry's Mod","g":"Party y casual","p":1,"o":"Familia"},{"n":"Ghost of Tsushima Director's Cut","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Gnarltoof's Revenge","g":"Indie y otros","p":0,"o":"Familia"},{"n":"God Game: The Odyssey","g":"Indie y otros","p":0,"o":"Familia"},{"n":"God of War","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Golden Light","g":"Terror","p":1,"o":"Familia"},{"n":"Gorky 17","g":"Estrategia","p":0,"o":"Familia"},{"n":"gravilon","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Gravity Circuit","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Green Hell","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Greyfox","g":"Indie y otros","p":0,"o":"Familia"},{"n":"GRID","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"GRID 2","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Grimm","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Ground Control Anthology","g":"Estrategia","p":0,"o":"Familia"},{"n":"Ground Control II","g":"Estrategia","p":0,"o":"Familia"},{"n":"Grounded 2","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Guardians of Victoria","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Gun Rocket","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Guns of Icarus Online","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Guns'N'Zombies","g":"Indie y otros","p":0,"o":"Familia"},{"n":"GUNTOUCHABLES","g":"Shooter","p":1,"o":"Familia"},{"n":"H1Z1: Test Server","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Hades","g":"Roguelike","p":0,"o":"Familia"},{"n":"Hades II","g":"Roguelike","p":0,"o":"Familia"},{"n":"Half-Life","g":"Shooter","p":0,"o":"Familia"},{"n":"Half-Life 2","g":"Shooter","p":0,"o":"Familia"},{"n":"Half-Life 2: Deathmatch","g":"Shooter","p":1,"o":"Familia"},{"n":"Half-Life Deathmatch: Source","g":"Shooter","p":1,"o":"Familia"},{"n":"Halls of Torment","g":"Roguelike","p":0,"o":"Familia"},{"n":"Halo: The Master Chief Collection","g":"Shooter","p":1,"o":"Familia"},{"n":"Heaven Island - VR MMO","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Heaven Island Life","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Heavy Metal Machines","g":"MMO y online","p":1,"o":"Familia"},{"n":"Heavy Rain","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Hell Yeah!","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Hellslave","g":"Indie y otros","p":0,"o":"Familia"},{"n":"HELLDIVERS 2","g":"Shooter","p":1,"o":"Familia"},{"n":"Heroes of Might & Magic V","g":"Estrategia","p":0,"o":"Familia"},{"n":"Heroes of Might & Magic V: Hammers of Fate","g":"Estrategia","p":0,"o":"Familia"},{"n":"Heroes of Might & Magic V: Tribes of the East","g":"Estrategia","p":0,"o":"Familia"},{"n":"Hi-Fi RUSH","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"High On Life","g":"Shooter","p":0,"o":"Familia"},{"n":"HITMAN","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"HITMAN 2","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Hitman 2: Silent Assassin","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Hitman: Absolution","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Hitman: Sniper Challenge","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Hogwarts Legacy","g":"RPG","p":0,"o":"Familia"},{"n":"Hollow Knight","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Hollow Knight: Silksong","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Holy Clash Cards","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Homefront","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Hooligan Vasja","g":"Indie y otros","p":0,"o":"Familia"},{"n":"House Flipper","g":"Simulación","p":0,"o":"Familia"},{"n":"How to Fish","g":"Tranquilos","p":0,"o":"Familia"},{"n":"Hue","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Hurtworld","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Hyper Light Drifter","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"I am weapon: Revival","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Iesabel","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Initial Drift Online","g":"Carreras y deportes","p":1,"o":"Familia"},{"n":"Injustice: Gods Among Us Ultimate Edition","g":"Lucha","p":1,"o":"Familia"},{"n":"Insincere","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Insurgency","g":"Shooter","p":1,"o":"Familia"},{"n":"Intergalactic Bubbles","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Intravenous","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Invasion: Brain Craving","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Islands of Insight","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Isle of Jura","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Jet Set Radio","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Journey To The Center Of The Earth","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Judge Dredd: Dredd vs Death","g":"Shooter","p":0,"o":"Familia"},{"n":"Just Survive Test Server","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Kao the Kangaroo: Round 2","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Katana ZERO","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Kena: Bridge of Spirits","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Kenshi","g":"RPG","p":0,"o":"Familia"},{"n":"Killing Floor","g":"Shooter","p":1,"o":"Familia"},{"n":"Kingdom Come: Deliverance","g":"RPG","p":0,"o":"Familia"},{"n":"Kingdom Come: Deliverance II","g":"RPG","p":0,"o":"Familia"},{"n":"Kingdom Hearts HD 1.5+2.5 ReMIX","g":"RPG","p":0,"o":"Familia"},{"n":"Kivi, Toilet and Shotgun","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Kraven Manor","g":"Terror","p":0,"o":"Familia"},{"n":"Krog Wars","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Labyronia RPG","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Labyronia RPG 2","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Last Survivor","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Layers of Fear (2016)","g":"Terror","p":0,"o":"Familia"},{"n":"Left 4 Dead 2","g":"Shooter","p":1,"o":"Familia"},{"n":"Legacy of Kain Soul Reaver 1&2 Remastered","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Legend of Mysteria","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Lies of P","g":"Soulslike","p":0,"o":"Familia"},{"n":"Life is Strange","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Like a Dragon Gaiden: The Man Who Erased His Name","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Like a Dragon: Ishin!","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"LIMBO","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Little Nightmares","g":"Terror","p":0,"o":"Familia"},{"n":"Little Nightmares Enhanced Edition","g":"Terror","p":0,"o":"Familia"},{"n":"Look Outside","g":"Terror","p":0,"o":"Familia"},{"n":"Lords of Magic: Special Edition","g":"Estrategia","p":0,"o":"Familia"},{"n":"Lords of the Realm","g":"Estrategia","p":0,"o":"Familia"},{"n":"Lords of the Realm II","g":"Estrategia","p":0,"o":"Familia"},{"n":"Lords of the Realm III","g":"Estrategia","p":0,"o":"Familia"},{"n":"Lucius","g":"Terror","p":0,"o":"Familia"},{"n":"Machinika Museum","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Mad Max","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mafia","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mafia: Edición Definitiva","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mafia II (Classic)","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mafia II: Edición Definitiva","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mafia III: Definitive Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Mage Arena","g":"Party y casual","p":1,"o":"Familia"},{"n":"Magicka 2","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Magicka 2: Spell Balance Beta","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Manhunter","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Marble Mayhem: Fragile Ball","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Marvel's Spider-Man 2","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Marvel's Spider-Man Remastered","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Masked Shooters 2","g":"Indie y otros","p":0,"o":"Familia"},{"n":"MECCHA CHAMELEON","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Medal of Honor: Airborne","g":"Shooter","p":0,"o":"Familia"},{"n":"Medieval Mercs","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Mega Man 11","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Mega Man X Legacy Collection","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Mega Man X Legacy Collection 2","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Merchants of Kaidan","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Metal Gear Rising: Revengeance","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Metaphor: ReFantazio","g":"RPG","p":0,"o":"Familia"},{"n":"Metro 2033","g":"Shooter","p":0,"o":"Familia"},{"n":"Metro 2033 Redux","g":"Shooter","p":0,"o":"Familia"},{"n":"Metro Exodus","g":"Shooter","p":0,"o":"Familia"},{"n":"Metro Exodus Enhanced Edition","g":"Shooter","p":0,"o":"Familia"},{"n":"Metro: Last Light Complete Edition","g":"Shooter","p":0,"o":"Familia"},{"n":"Mewgenics","g":"Roguelike","p":0,"o":"Familia"},{"n":"Middle-earth: Shadow of Mordor","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Middle-earth: Shadow of War","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Minecraft Dungeons","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Minecraft Legends","g":"Estrategia","p":1,"o":"Familia"},{"n":"Mini Attack Submarine","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Mini Thief","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Minion Masters","g":"Estrategia","p":1,"o":"Familia"},{"n":"Mirage: Arcane Warfare","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Monster Hunter Wilds","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Monster Hunter: World","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Monster Truck Destruction","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"MoonBase Commander","g":"Estrategia","p":0,"o":"Familia"},{"n":"Moonlight Peaks","g":"Tranquilos","p":0,"o":"Familia"},{"n":"Morphopolis","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Mortal Kombat 1","g":"Lucha","p":1,"o":"Familia"},{"n":"Mortal Kombat 11","g":"Lucha","p":1,"o":"Familia"},{"n":"Mortal Kombat X","g":"Lucha","p":1,"o":"Familia"},{"n":"MOUSE: P.I. For Hire","g":"Shooter","p":0,"o":"Familia"},{"n":"Murdered: Soul Suspect","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Naruto Shippuden: Ultimate Ninja (3 entregas)","g":"Lucha","p":1,"o":"Familia"},{"n":"Necesse","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Nether","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"NEXT JUMP: Shmup Tactics","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Nine Sols","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Nioh: Complete Edition","g":"Soulslike","p":0,"o":"Familia"},{"n":"Nocturnal","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Octopath Traveler II","g":"RPG","p":0,"o":"Familia"},{"n":"Oddworld: Abe's Oddysee","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Ori and the Blind Forest","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Ori and the Blind Forest: Definitive Edition","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Ori and the Will of the Wisps","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"ORION: Prelude","g":"Shooter","p":1,"o":"Familia"},{"n":"Outland","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Outlast","g":"Terror","p":0,"o":"Familia"},{"n":"Outlast 2","g":"Terror","p":0,"o":"Familia"},{"n":"Outrage","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Overcast - Walden and the Werewolf","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Overcooked","g":"Party y casual","p":1,"o":"Familia"},{"n":"Overture","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Pacify","g":"Terror","p":1,"o":"Familia"},{"n":"Pankapu","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"PARTICLE MACE","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Particula","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Party Club","g":"Party y casual","p":1,"o":"Familia"},{"n":"PAYDAY: The Heist","g":"Shooter","p":1,"o":"Familia"},{"n":"PAYDAY 2","g":"Shooter","p":1,"o":"Familia"},{"n":"Penumbra: Necrologue","g":"Terror","p":0,"o":"Familia"},{"n":"Persona 3 Reload","g":"RPG","p":0,"o":"Familia"},{"n":"Persona 5 Royal","g":"RPG","p":0,"o":"Familia"},{"n":"Pet Lands","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Pirates of Black Cove Gold","g":"Estrategia","p":0,"o":"Familia"},{"n":"Planet Coaster","g":"Simulación","p":0,"o":"Familia"},{"n":"Poly Bridge","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Portal 2","g":"Narrativo y puzzles","p":1,"o":"Familia"},{"n":"Portal 2 Sixense Perceptual Pack","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"POSTAL","g":"Shooter","p":0,"o":"Familia"},{"n":"PRAGMATA","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Press Any Button","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Prey","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Prey: Typhon Hunter","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Pristine world","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Project Starship","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Project Zomboid","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Psychonauts","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"PulseCharge","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Purgatory","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Qubburo 2","g":"Indie y otros","p":0,"o":"Familia"},{"n":"QuestRun","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Quick Slick Deadly","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Rabiez: Epidemic","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Rain World","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Relic Hunters Zero: Remix","g":"Roguelike","p":1,"o":"Familia"},{"n":"Renegade Ops","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"REPLACED","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"R.E.P.O.","g":"Terror","p":1,"o":"Familia"},{"n":"Resident Evil","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 0","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 2","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 3","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 4","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 4 (2005)","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil 5","g":"Terror","p":1,"o":"Familia"},{"n":"Resident Evil 6","g":"Terror","p":1,"o":"Familia"},{"n":"Resident Evil 7 Biohazard","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil Requiem","g":"Terror","p":0,"o":"Familia"},{"n":"Resident Evil Resistance","g":"Terror","p":1,"o":"Familia"},{"n":"Resident Evil Re:Verse","g":"Terror","p":1,"o":"Familia"},{"n":"Resident Evil Village","g":"Terror","p":0,"o":"Familia"},{"n":"ReStory: Chill Electronics Repair","g":"Simulación","p":0,"o":"Familia"},{"n":"Rhino's Rage","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Rise of the Tomb Raider","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Risk of Rain 2","g":"Roguelike","p":1,"o":"Familia"},{"n":"Rogue Legacy 2","g":"Roguelike","p":0,"o":"Familia"},{"n":"Rogue Trooper","g":"Shooter","p":0,"o":"Familia"},{"n":"Rolling Sun","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Room Craft","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Rover Rescue","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Russian Life Simulator","g":"Simulación","p":0,"o":"Familia"},{"n":"Saints Row 2","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Satisfactory","g":"Simulación","p":1,"o":"Familia"},{"n":"Saviors","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Scorn","g":"Terror","p":0,"o":"Familia"},{"n":"ScourgeBringer","g":"Roguelike","p":0,"o":"Familia"},{"n":"Scribblenauts Unlimited","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Scribblenauts Unmasked","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Scritchy Scratchy","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Sea of Stars: Sunset Edition","g":"RPG","p":0,"o":"Familia"},{"n":"Secret Of Magia","g":"Indie y otros","p":0,"o":"Familia"},{"n":"SEGA Mega Drive & Genesis Classics","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Sekiro: Shadows Die Twice","g":"Soulslike","p":0,"o":"Familia"},{"n":"Serena","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Shadow of the Tomb Raider","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Shadow Warrior","g":"Shooter","p":0,"o":"Familia"},{"n":"ShipLord","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Shipped","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Shogun Showdown","g":"Roguelike","p":0,"o":"Familia"},{"n":"Silent Hill 2","g":"Terror","p":0,"o":"Familia"},{"n":"Sins Of The Demon RPG","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Skara - The Blade Remains","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Skillshot City","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Skullgirls 2nd Encore","g":"Lucha","p":1,"o":"Familia"},{"n":"Slay the Spire","g":"Roguelike","p":0,"o":"Familia"},{"n":"Sleeping Dogs: Definitive Edition","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"SLUDGE LIFE","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Smart Factory Tycoon","g":"Simulación","p":0,"o":"Familia"},{"n":"Sniper Elite","g":"Shooter","p":1,"o":"Familia"},{"n":"Sniper Elite V2","g":"Shooter","p":1,"o":"Familia"},{"n":"Sniper Elite 3","g":"Shooter","p":1,"o":"Familia"},{"n":"Sniper Elite 4","g":"Shooter","p":1,"o":"Familia"},{"n":"Sniper Elite: Nazi Zombie Army","g":"Shooter","p":1,"o":"Familia"},{"n":"Sniper Elite: Nazi Zombie Army 2","g":"Shooter","p":1,"o":"Familia"},{"n":"SOMA","g":"Terror","p":0,"o":"Familia"},{"n":"Sonic Adventure 2","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Sonic Frontiers","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Sonic Mania","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Sonic X Shadow Generations","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Sons Of The Forest","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"South Park: The Stick of Truth","g":"RPG","p":0,"o":"Familia"},{"n":"Space Pilgrim Episode II: Epsilon Indi","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Spec Ops: The Line","g":"Shooter","p":0,"o":"Familia"},{"n":"SpongeBob SquarePants: Battle for Bikini Bottom","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Spyro Reignited Trilogy","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"State of Anarchy","g":"Indie y otros","p":0,"o":"Familia"},{"n":"SteamWorld Dig","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"Storm of Spears","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Stray","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Street Fighter 6","g":"Lucha","p":1,"o":"Familia"},{"n":"Street Racing Syndicate","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Subnautica","g":"Supervivencia y crafteo","p":0,"o":"Familia"},{"n":"Subnautica 2","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Sunset Overdrive","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Super Duper Party Pooper","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Super Meat Boy","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"TEKKEN 7","g":"Lucha","p":1,"o":"Familia"},{"n":"TEKKEN 8","g":"Lucha","p":1,"o":"Familia"},{"n":"Tell Me Why","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Tempest","g":"RPG","p":0,"o":"Familia"},{"n":"TeraBlaster","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Terraria","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"TGV Voyages Train Simulator","g":"Simulación","p":0,"o":"Familia"},{"n":"The Archotek Project","g":"Indie y otros","p":0,"o":"Familia"},{"n":"The Awesome Adventures of Captain Spirit","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Binding of Isaac: Rebirth","g":"Roguelike","p":1,"o":"Familia"},{"n":"The Bureau: XCOM Declassified","g":"Shooter","p":0,"o":"Familia"},{"n":"The Chosen RPG","g":"Indie y otros","p":0,"o":"Familia"},{"n":"The Dark Pictures Anthology (5 entregas: House of Ashes, Little Hope, The Devil in Me, etc.)","g":"Terror","p":1,"o":"Familia"},{"n":"The Descendant","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Elder Scrolls V: Skyrim Special Edition","g":"RPG","p":0,"o":"Familia"},{"n":"The Escape: Together","g":"Terror","p":1,"o":"Familia"},{"n":"The Evil Within","g":"Terror","p":0,"o":"Familia"},{"n":"The Evil Within 2","g":"Terror","p":0,"o":"Familia"},{"n":"The Gunk","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"The Last Faith","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"The Last of Us Parte I","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"The Last of Us Parte II Remastered","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"The LEGO NINJAGO Movie Video Game","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"The Life and Suffering of Sir Brante","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Lord of the Rings: War in the North","g":"RPG","p":1,"o":"Familia"},{"n":"The Messenger","g":"Plataformas y metroidvania","p":0,"o":"Familia"},{"n":"The Red Solstice","g":"Estrategia","p":1,"o":"Familia"},{"n":"The Sinking City Remastered","g":"Terror","p":0,"o":"Familia"},{"n":"The Slaughtering Grounds","g":"Indie y otros","p":0,"o":"Familia"},{"n":"The Stanley Parable: Ultra Deluxe","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Walking Dead","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Walking Dead: The Telltale Definitive Series","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"The Witcher 2: Assassins of Kings","g":"RPG","p":0,"o":"Familia"},{"n":"The Witcher 3: Wild Hunt","g":"RPG","p":0,"o":"Familia"},{"n":"The Wolf Among Us","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Tina Chiquitina asalta la mazmorra","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Tiny Bridge: Ratventure","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"tModLoader","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Tom Clancy's Splinter Cell: Double Agent","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Tom Clancy's The Division 2 - Test Server","g":"Shooter","p":1,"o":"Familia"},{"n":"Tom Clancy's The Division PTS","g":"Shooter","p":1,"o":"Familia"},{"n":"Tomb Raider","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Tomb Raider I-III Remastered","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Tomb Raider IV-VI Remastered","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Tomb Raider: Legend","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Tomb Raider: Underworld","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Totally Accurate Battlegrounds","g":"Party y casual","p":1,"o":"Familia"},{"n":"Train Sim World 5","g":"Simulación","p":0,"o":"Familia"},{"n":"Train Sim World 6","g":"Simulación","p":0,"o":"Familia"},{"n":"Trinium Wars","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Tropico 4","g":"Estrategia","p":0,"o":"Familia"},{"n":"Two Worlds II HD","g":"RPG","p":0,"o":"Familia"},{"n":"Ultimate Marvel vs. Capcom 3","g":"Lucha","p":1,"o":"Familia"},{"n":"Ultimate Zombie Defense","g":"Estrategia","p":1,"o":"Familia"},{"n":"Uncanny Tales: Cold Road","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Undertale","g":"RPG","p":0,"o":"Familia"},{"n":"Unknown Battle","g":"Indie y otros","p":0,"o":"Familia"},{"n":"UNLOVED","g":"Shooter","p":1,"o":"Familia"},{"n":"Until Dawn","g":"Terror","p":0,"o":"Familia"},{"n":"Valheim","g":"Supervivencia y crafteo","p":1,"o":"Familia"},{"n":"Vanquish","g":"Shooter","p":0,"o":"Familia"},{"n":"Vertiginous Golf","g":"Carreras y deportes","p":0,"o":"Familia"},{"n":"Viking: Battle for Asgard","g":"Acción y aventura","p":0,"o":"Familia"},{"n":"Violett","g":"Narrativo y puzzles","p":0,"o":"Familia"},{"n":"Visage","g":"Terror","p":0,"o":"Familia"},{"n":"Viscera Cleanup Detail: Shadow Warrior","g":"Simulación","p":1,"o":"Familia"},{"n":"Warhammer 40,000: Gladius","g":"Estrategia","p":0,"o":"Familia"},{"n":"Warhammer 40,000: Space Marine (3 entradas, incluye Space Marine 2)","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Warhammer: Vermintide 2","g":"Acción y aventura","p":1,"o":"Familia"},{"n":"Waveform","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Weapon of Choice","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Welcome to Elderfield","g":"Terror","p":0,"o":"Familia"},{"n":"Well Dweller","g":"Indie y otros","p":0,"o":"Familia"},{"n":"WHAT THE PAK?!","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Why So Evil","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Why So Evil 2: Dystopia","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Wild Terra 2: New Lands","g":"MMO y online","p":1,"o":"Familia"},{"n":"Winged Knights: Penetration","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Withering Kingdom: Arcane War","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Wizard of Legend 2","g":"Roguelike","p":1,"o":"Familia"},{"n":"Woodle Tree Adventures","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Woolfe - The Red Hood Diaries","g":"Indie y otros","p":0,"o":"Familia"},{"n":"World of Tanks Blitz","g":"MMO y online","p":1,"o":"Familia"},{"n":"Wyatt Derp","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Wyatt Derp 2: Peacekeeper","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Yakuza: Like a Dragon","g":"RPG","p":0,"o":"Familia"},{"n":"Yargis - Space Melee","g":"Indie y otros","p":0,"o":"Familia"},{"n":"Zombie Army Trilogy","g":"Shooter","p":1,"o":"Familia"},{"n":"Zynga Poker - Texas Holdem","g":"MMO y online","p":1,"o":"Familia"}];
+const SUGERENCIAS = [{"name": "Balatro", "genre": "Roguelike", "group": false, "note": "Roguelike de cartas basado en póker, barato y muy adictivo."}, {"name": "Inscryption", "genre": "Roguelike", "group": false, "note": "Deckbuilder con terror y misterio, para fans de Slay the Spire."}, {"name": "Noita", "genre": "Roguelike", "group": false, "note": "Roguelike donde cada píxel tiene física."}, {"name": "Vampire Survivors", "genre": "Roguelike", "group": true, "note": "El original del género de Halls of Torment, con cooperativo local."}, {"name": "Phasmophobia", "genre": "Terror", "group": true, "note": "Cazar fantasmas en grupo, en la línea de Lethal Company."}, {"name": "Abiotic Factor", "genre": "Supervivencia y crafteo", "group": true, "note": "Supervivencia cooperativa en un laboratorio estilo Half-Life."}, {"name": "Schedule I", "genre": "Simulación", "group": true, "note": "Gestión y caos en cooperativo."}, {"name": "Palworld", "genre": "Supervivencia y crafteo", "group": true, "note": "Supervivencia y captura de criaturas; tiene la etiqueta Family Sharing."}, {"name": "Raft", "genre": "Supervivencia y crafteo", "group": true, "note": "Supervivencia relajada en el mar, ideal en grupo."}, {"name": "Dredge", "genre": "Tranquilos", "group": false, "note": "Pesca con horror cósmico, para fans de Dave the Diver."}, {"name": "Spiritfarer", "genre": "Tranquilos", "group": false, "note": "Gestión acogedora con muy buena historia."}, {"name": "PowerWash Simulator", "genre": "Simulación", "group": true, "note": "Relajante y con cooperativo."}, {"name": "Divinity: Original Sin 2", "genre": "RPG", "group": true, "note": "Del mismo estudio que Baldur's Gate 3, con cooperativo."}, {"name": "Dragon's Dogma 2", "genre": "RPG", "group": false, "note": "La familia solo tiene el primero; tiene la etiqueta Family Sharing."}, {"name": "Outer Wilds", "genre": "Narrativo y puzzles", "group": false, "note": "Exploración espacial, de los mejor valorados de la última década."}, {"name": "Animal Well", "genre": "Plataformas y metroidvania", "group": false, "note": "Metroidvania lleno de secretos, para después de Silksong."}];
+const MIEMBROS_INICIALES = [{"name": "ZhamanG", "steam": "https://steamcommunity.com/profiles/76561198254181688/", "wishlist": ["Grand Theft Auto IV: The Complete Edition", "Fallout: New Vegas", "FINAL FANTASY XIV Online", "Project Zomboid", "Dishonored", "ENSLAVED: Odyssey to the West Premium Edition", "The Witcher 3: Wild Hunt", "Killer is Dead - Nightmare Edition", "NARUTO SHIPPUDEN: Ultimate Ninja STORM 4", "Q.U.B.E. 2", "ASTRONEER", "NieR:Automata", "TUNIC", "The Siege and the Sandfox", "Comedy Night", "Roboquest"]}];
+const GENRES = ["Acción y aventura","RPG","Soulslike","Shooter","Roguelike","Plataformas y metroidvania","Terror","Supervivencia y crafteo","Estrategia","Simulación","Party y casual","Lucha","Carreras y deportes","Narrativo y puzzles","Tranquilos","MMO y online","Indie y otros"];
+const $ = s => document.querySelector(s);
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+const LIBSET = new Set(GAMES.map(g => norm(g.n)));
+function el(tag, cls, text){const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e;}
+function toast(msg){const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>t.hidden=true,2600);}
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- pestañas ---------- */
+const TABS = {lib:"", vote:"#votacion", mem:"#integrantes"};
+function showTab(which){
+  Object.keys(TABS).forEach(k=>{ $("#tab-"+k).setAttribute("aria-selected", k===which); $("#pane-"+k).hidden = k!==which; });
+  history.replaceState(null, "", TABS[which] || location.pathname);
+}
+Object.keys(TABS).forEach(k=>$("#tab-"+k).onclick=()=>showTab(k));
+if (location.hash === "#votacion") showTab("vote");
+if (location.hash === "#integrantes") showTab("mem");
+
+/* ---------- biblioteca ---------- */
+const state = {genre:"", q:"", origin:"", grp:false, sort:"n", dir:1};
+const counts = {}; GENRES.forEach(g => counts[g]=0); GAMES.forEach(g => counts[g.g]++);
+const maxCount = Math.max(...Object.values(counts));
+[[GAMES.length,"juegos"],[GAMES.filter(g=>g.o==="Familia").length,"en el grupo familiar"],[GAMES.filter(g=>g.p).length,"para jugar en grupo"],[GENRES.length,"géneros"]].forEach(([n,t])=>{
+  const s=el("span"); s.append(el("b",null,n)," "+t); $("#stats").append(s);
+});
+function renderGenres(){
+  const box=$("#genres"); box.textContent="";
+  GENRES.slice().sort((a,b)=>counts[b]-counts[a]).forEach(g=>{
+    const b=el("button","genre"); b.type="button"; b.setAttribute("aria-pressed", state.genre===g);
+    b.append(el("span",null,g), el("span","n",counts[g]));
+    const bar=el("span","bar"); bar.style.width=(counts[g]/maxCount*100)+"%"; b.append(bar);
+    b.onclick=()=>{state.genre = state.genre===g ? "" : g; renderGenres(); renderRows();};
+    box.append(b);
+  });
+}
+function filtered(){
+  const q = norm(state.q);
+  let list = GAMES.filter(g => (!state.genre || g.g===state.genre) && (!state.origin || g.o===state.origin) && (!state.grp || g.p) && (!q || norm(g.n).includes(q)));
+  const k = state.sort, d = state.dir;
+  list.sort((a,b)=>{const x=a[k], y=b[k]; if(x===y) return a.n.localeCompare(b.n,"es"); return (typeof x==="number" ? x-y : String(x).localeCompare(String(y),"es"))*d;});
+  return list;
+}
+function renderRows(){
+  const list = filtered(); const tb=$("#rows"); tb.textContent="";
+  const frag=document.createDocumentFragment();
+  list.forEach(g=>{
+    const tr=el("tr");
+    tr.append(el("td","name",g.n));
+    const tdG=el("td"); tdG.append(el("span","pill genre-p",g.g)); tr.append(tdG);
+    const tdP=el("td"); if(g.p) tdP.append(el("span","pill grp","Sí")); else tdP.append(el("span","muted","—")); tr.append(tdP);
+    tr.append(el("td","muted", g.o));
+    frag.append(tr);
+  });
+  tb.append(frag);
+  $("#shown").textContent = list.length===GAMES.length ? `Mostrando los ${list.length} juegos` : `Mostrando ${list.length} de ${GAMES.length} juegos` + (state.genre ? ` · ${state.genre}` : "");
+  document.querySelectorAll("th[data-k]").forEach(th=>th.setAttribute("aria-sort", th.dataset.k===state.sort ? (state.dir>0?"ascending":"descending") : "none"));
+}
+document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k; if(state.sort===k) state.dir*=-1; else {state.sort=k; state.dir = k==="p" ? -1 : 1;} renderRows();});
+$("#q").oninput = e => {state.q=e.target.value; renderRows();};
+$("#origin").onchange = e => {state.origin=e.target.value; renderRows();};
+$("#grp").onchange = e => {state.grp=e.target.checked; renderRows();};
+renderGenres(); renderRows();
+
+/* ---------- exportar ---------- */
+function csv(rows){return "﻿" + rows.map(r=>r.map(c=>{c=String(c??""); return /[;"\n]/.test(c) ? '"'+c.replace(/"/g,'""')+'"' : c;}).join(";")).join("\r\n");}
+function offer(filename, data){
+  const url = URL.createObjectURL(new Blob([data], {type:"text/csv;charset=utf-8"}));
+  const a = el("a"); a.href=url; a.download=filename; document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+$("#export-lib").onclick = () => offer("biblioteca-familiar-steam.csv", csv([["Juego","Género","En grupo","Biblioteca"], ...filtered().map(g=>[g.n,g.g,g.p?"Sí":"No",g.o])]));
+
+/* ---------- votación ---------- */
+const fGenre=$("#f-genre"); GENRES.forEach(g=>{const o=el("option",null,g); o.value=g; fGenre.append(o);});
+let fs=null, cands=[], votes={}, myName=store.get("miNombre")||"";
+const meId = () => myName ? norm(myName) || null : null;
+$("#f-me").value = myName;
+
+function notice(msg){const n=$("#vote-notice"); n.textContent=msg; n.hidden=!msg;}
+function setFormEnabled(on){["#f-name","#f-genre","#f-grp","#f-note","#f-submit"].forEach(s=>$(s).disabled=!on);}
+function refreshAccess(){
+  if(!fs){ setFormEnabled(false); return; }
+  setFormEnabled(!!meId());
+  notice(meId() ? "" : "Escribe tu nombre en el panel para poder votar y proponer juegos.");
+}
+$("#f-me").addEventListener("change", e=>{
+  myName = e.target.value.trim(); store.set("miNombre", myName); refreshAccess(); renderCands();
+  if(meId()) toast("Votarás como " + myName);
+});
+$("#who-form").addEventListener("submit", e=>e.preventDefault());
+
+$("#f-name").oninput = e => {
+  const v=norm(e.target.value); const d=$("#f-dupe");
+  if(v && LIBSET.has(v)){d.textContent="Ya está en la biblioteca"; d.hidden=false;}
+  else if(v && cands.some(c=>norm(c.name)===v)){d.textContent="Ya está en la votación"; d.hidden=false;}
+  else d.hidden=true;
+};
+
+function tally(){
+  const t={}; Object.entries(votes).forEach(([uid,v])=>Object.keys(v.picks||{}).forEach(cid=>{ if(v.picks[cid]) (t[cid] ||= []).push(uid); }));
+  return t;
+}
+function renderCands(){
+  const t = tally();
+  const active = cands.filter(c=>c.status!=="comprado").sort((a,b)=>(t[b.id]?.length||0)-(t[a.id]?.length||0) || (a.createdAt||0)-(b.createdAt||0));
+  const done = cands.filter(c=>c.status==="comprado");
+  $("#cand-count").textContent = active.length;
+  const box=$("#cands"); box.textContent="";
+  if(!fs){ box.append(el("div","empty","La votación todavía no está configurada. Falta pegar los datos de Firebase en el archivo.")); return; }
+  if(!active.length){
+    const e=el("div","empty"); e.append(el("p",null,"Todavía no hay candidatos. Propón el primero con el formulario."));
+    if(!cands.length){ const b=el("button","btn","Cargar las 16 sugerencias de Claude"); b.type="button"; b.onclick=seed; e.append(b); }
+    box.append(e);
+  }
+  const topVotes = active.length ? (t[active[0].id]?.length||0) : 0;
+  active.forEach((c,i)=>box.append(card(c, t[c.id]||[], i+1, topVotes>0 && (t[c.id]?.length||0)===topVotes)));
+  const bb=$("#bought"); bb.textContent=""; $("#bought-box").hidden = !done.length; $("#bought-n").textContent=done.length;
+  done.forEach(c=>bb.append(card(c, t[c.id]||[], null, false)));
+}
+function card(c, voters, rank, lead){
+  const d=el("div","cand"+(lead?" lead":""));
+  d.append(el("div","rank", rank==null ? "✓" : rank));
+  const body=el("div"); body.style.minWidth="0";
+  body.append(el("h3",null,c.name||"Sin nombre"));
+  const meta=el("div","meta");
+  if(c.genre) meta.append(el("span","pill genre-p",c.genre));
+  if(c.group) meta.append(el("span","pill grp","En grupo"));
+  if(LIBSET.has(norm(c.name||""))) meta.append(el("span","pill warn","Ya está en la biblioteca"));
+  if(c.status==="comprado") meta.append(el("span","pill own","Comprado"));
+  body.append(meta);
+  if(c.note) body.append(el("p","note",c.note));
+  if(voters.length){ body.append(el("div","who", "Votaron: " + voters.map(id=>(votes[id]&&votes[id].name)||id).join(", "))); }
+  if(meId()){
+    const a=el("div","actions");
+    const toggle=el("button","linkish", c.status==="comprado" ? "Volver a la votación" : "Marcar como comprado"); toggle.type="button";
+    toggle.onclick=()=>write(()=>fs.collection("candidates").doc(c.id).update({status: c.status==="comprado" ? "pendiente" : "comprado"}));
+    const del=el("button","linkish danger","Quitar"); del.type="button";
+    del.onclick=()=>{ if(del.dataset.arm){ write(()=>fs.collection("candidates").doc(c.id).delete()).then(()=>toast("Candidato quitado")); } else { del.dataset.arm="1"; del.textContent="¿Seguro? Toca otra vez para quitar"; setTimeout(()=>{del.dataset.arm=""; del.textContent="Quitar";},4000);} };
+    a.append(toggle, del); body.append(a);
+  }
+  d.append(body);
+  if(rank!=null){
+    const id=meId(); const mine = id && votes[id] && votes[id].picks && votes[id].picks[c.id];
+    const b=el("button","vote-btn"); b.type="button"; b.setAttribute("aria-pressed", !!mine);
+    b.append(el("span","v",voters.length), el("span",null, mine ? "Votaste" : "Votar"));
+    b.disabled = !fs || !id;
+    b.onclick=()=>toggleVote(c.id);
+    d.append(b);
+  }
+  return d;
+}
+let chain = Promise.resolve();
+function write(fn){ chain = chain.then(fn).catch(()=>toast("No se pudo guardar. Revisa tu conexión.")); return chain; }
+function toggleVote(cid){
+  const id=meId(); if(!id) return;
+  const picks = Object.assign({}, (votes[id]&&votes[id].picks)||{});
+  if(picks[cid]) delete picks[cid]; else picks[cid]=true;
+  votes[id] = {name:myName, picks}; renderCands();
+  write(()=>fs.collection("votes").doc(id).set({name:myName, picks}));
+}
+function seed(){
+  write(async ()=>{ const batch=fs.batch(); SUGERENCIAS.forEach((s,i)=>batch.set(fs.collection("candidates").doc(), Object.assign({status:"pendiente", createdAt:Date.now()+i, addedBy:"Claude"}, s))); await batch.commit(); toast("Sugerencias cargadas"); });
+}
+$("#add-form").addEventListener("submit", e=>{
+  e.preventDefault(); const id=meId(); if(!fs || !id) return;
+  const name=$("#f-name").value.trim(); if(!name) return;
+  if(cands.some(c=>norm(c.name)===norm(name))){ toast("Ese juego ya está en la votación"); return; }
+  const data={name, genre:$("#f-genre").value, group:$("#f-grp").checked, note:$("#f-note").value.trim(), status:"pendiente", createdAt:Date.now(), addedBy:myName};
+  write(async ()=>{ const ref = await fs.collection("candidates").add(data);
+    const picks=Object.assign({}, (votes[id]&&votes[id].picks)||{}, {[ref.id]:true}); votes[id]={name:myName,picks};
+    await fs.collection("votes").doc(id).set({name:myName, picks});
+    $("#add-form").reset(); $("#f-dupe").hidden=true; toast("Agregado y votado por ti"); });
+});
+$("#export-votes").onclick = ()=>{
+  const t=tally();
+  const rows=cands.slice().sort((a,b)=>(t[b.id]?.length||0)-(t[a.id]?.length||0)).map(c=>[c.name,c.genre||"",c.group?"Sí":"No",t[c.id]?.length||0,(t[c.id]||[]).map(id=>(votes[id]&&votes[id].name)||id).join(", "),c.status==="comprado"?"Comprado":"Pendiente",c.note||""]);
+  offer("votacion-juegos.csv", csv([["Juego","Género","En grupo","Votos","Quién votó","Estado","Nota"],...rows]));
+};
+
+
+/* ---------- integrantes y wishlists ---------- */
+let members = [];
+const candSet = () => new Set(cands.filter(c=>c.status!=="comprado").map(c=>norm(c.name||"")));
+function memberDoc(id){ return fs.collection("members").doc(id); }
+function renderMembers(){
+  $("#mem-count").textContent = members.length;
+  const dl=$("#member-names"); dl.textContent=""; members.forEach(m=>{const o=el("option"); o.value=m.name; dl.append(o);});
+  const box=$("#members"); box.textContent="";
+  if(!fs){ box.append(el("div","empty","Los integrantes se guardan en Firebase. Falta pegar los datos de Firebase en el archivo.")); renderHot(); return; }
+  if(!members.length){
+    const e=el("div","empty"); e.append(el("p",null,"Todavía no hay integrantes. Agrega el primero con el formulario."));
+    if(MIEMBROS_INICIALES.length){ const b=el("button","btn","Cargar los integrantes que preparó Claude"); b.type="button"; b.onclick=seedMembers; e.append(b); }
+    box.append(e);
+  }
+  const cs = candSet();
+  members.slice().sort((a,b)=>a.name.localeCompare(b.name,"es")).forEach(m=>box.append(memberCard(m, cs)));
+  renderHot();
+}
+function memberCard(m, cs){
+  const d=el("div","member");
+  const head=el("div","member-head"); head.append(el("h3",null,m.name));
+  const wl = m.wishlist||[];
+  const owned = wl.filter(g=>LIBSET.has(norm(g))).length;
+  head.append(el("span","shown", wl.length + " en wishlist" + (owned ? " · " + owned + " ya en la familia" : "")));
+  d.append(head);
+  if(m.steam && /^https:\/\/(steamcommunity\.com|store\.steampowered\.com)\//.test(m.steam)){ const a=el("a",null,"Ver perfil de Steam"); a.href=m.steam; a.target="_blank"; a.rel="noopener"; d.append(a); }
+  const ul=el("ul","wl");
+  wl.forEach((g,i)=>{
+    const li=el("li"); li.append(el("span","t",g));
+    const tags=el("span","tags");
+    if(LIBSET.has(norm(g))) tags.append(el("span","pill own","Ya lo tienen"));
+    else if(cs.has(norm(g))) tags.append(el("span","pill vot","En votación"));
+    else { const p=el("button","linkish","Proponer"); p.type="button"; p.title="Agregar a la votación"; p.onclick=()=>proposeFromWishlist(g, [m.name]); tags.append(p); }
+    const x=el("button","x","×"); x.type="button"; x.setAttribute("aria-label","Quitar "+g+" de la wishlist"); x.onclick=()=>{ const next=wl.slice(); next.splice(i,1); saveWishlist(m, next); };
+    tags.append(x); li.append(tags); ul.append(li);
+  });
+  if(!wl.length) ul.append(el("li","muted","Wishlist vacía"));
+  d.append(ul);
+  const ta=el("textarea"); ta.id="wl-"+m.id; ta.placeholder="Pega juegos de la wishlist, uno por línea"; ta.setAttribute("aria-label","Agregar juegos a la wishlist de "+m.name);
+  const row=el("div","actions");
+  const add=el("button","btn small","Agregar a la wishlist"); add.type="button";
+  add.onclick=()=>{ const have=new Set(wl.map(norm)); const extra=ta.value.split(/\n|,/).map(x=>x.trim()).filter(x=>x && !have.has(norm(x)) && (have.add(norm(x)),true)); if(!extra.length) return; saveWishlist(m, wl.concat(extra)); ta.value=""; };
+  const del=el("button","linkish danger","Quitar integrante"); del.type="button";
+  del.onclick=()=>{ if(del.dataset.arm){ write(()=>memberDoc(m.id).delete()).then(()=>toast("Integrante quitado")); } else { del.dataset.arm="1"; del.textContent="¿Seguro? Toca otra vez"; setTimeout(()=>{del.dataset.arm=""; del.textContent="Quitar integrante";},4000);} };
+  row.append(add, del);
+  d.append(ta, row);
+  return d;
+}
+function saveWishlist(m, list){ m.wishlist=list; renderMembers(); write(()=>memberDoc(m.id).update({wishlist:list})); }
+function renderHot(){
+  const box=$("#hot"); box.textContent="";
+  const want={}; // norm -> {name, who:[]}
+  members.forEach(m=>(m.wishlist||[]).forEach(g=>{ const k=norm(g); if(!k || LIBSET.has(k)) return; (want[k] ||= {name:g, who:[]}); if(!want[k].who.includes(m.name)) want[k].who.push(m.name); }));
+  const list = Object.values(want).filter(w=>w.who.length>=2).sort((a,b)=>b.who.length-a.who.length || a.name.localeCompare(b.name,"es"));
+  if(!list.length){ box.append(el("div","empty", members.length ? "Todavía no hay juegos que quieran dos o más personas." : "Aparecerán aquí cuando haya integrantes con wishlist.")); return; }
+  const cs=candSet();
+  list.forEach(w=>{
+    const d=el("div","cand");
+    d.append(el("div","hot-n", w.who.length));
+    const body=el("div"); body.style.minWidth="0"; body.append(el("h3",null,w.name));
+    body.append(el("div","who","Lo quieren: "+w.who.join(", ")));
+    d.append(body);
+    if(cs.has(norm(w.name))) d.append(el("span","pill vot","En votación"));
+    else { const b=el("button","btn small","Proponer"); b.type="button"; b.onclick=()=>proposeFromWishlist(w.name, w.who); d.append(b); }
+    box.append(d);
+  });
+}
+function proposeFromWishlist(name, who){
+  if(!fs) return;
+  if(cands.some(c=>norm(c.name)===norm(name))){ toast("Ya está en la votación"); return; }
+  write(()=>fs.collection("candidates").add({name, genre:"Indie y otros", group:false, note:"En la wishlist de "+who.join(", "), status:"pendiente", createdAt:Date.now(), addedBy:myName||null})).then(()=>toast(name+" pasó a la votación"));
+}
+function seedMembers(){
+  write(async ()=>{ const batch=fs.batch(); MIEMBROS_INICIALES.forEach((m,i)=>batch.set(memberDoc(norm(m.name)||("m"+i)), Object.assign({createdAt:Date.now()+i, steam:"", wishlist:[]}, m))); await batch.commit(); toast("Integrantes cargados"); });
+}
+$("#mem-form").addEventListener("submit", e=>{
+  e.preventDefault(); if(!fs) return;
+  const name=$("#m-name").value.trim(); const id=norm(name); if(!id) return;
+  if(members.some(m=>m.id===id)){ toast("Ese integrante ya existe"); return; }
+  const steam=$("#m-steam").value.trim();
+  write(()=>memberDoc(id).set({name, steam, wishlist:[], createdAt:Date.now()})).then(()=>{ $("#mem-form").reset(); toast(name+" agregado"); });
+});
+
+(function init(){
+  if(!FIREBASE_CONFIG.projectId || typeof firebase==="undefined"){
+    notice("La votación todavía no está configurada: falta pegar los datos de Firebase al principio del archivo.");
+    refreshAccess(); renderCands(); renderMembers(); $("#mem-notice").textContent="Los integrantes todavía no están configurados: falta pegar los datos de Firebase al principio del archivo."; $("#mem-notice").hidden=false; return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG); fs = firebase.firestore();
+  refreshAccess();
+  fs.collection("candidates").onSnapshot(s=>{ cands=s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderCands(); renderMembers(); }, ()=>notice("No se pudo leer la votación. Revisa las reglas de Firestore."));
+  fs.collection("members").onSnapshot(s=>{ members=s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderMembers(); }, ()=>{ $("#mem-notice").textContent="No se pudo leer la lista de integrantes. Revisa las reglas de Firestore."; $("#mem-notice").hidden=false; });
+  fs.collection("votes").onSnapshot(s=>{ const v={}; s.docs.forEach(d=>v[d.id]=d.data()); votes=v; renderCands(); }, ()=>{});
+})();
+</script>
+
+</body>
+</html>
