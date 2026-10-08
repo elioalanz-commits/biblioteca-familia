@@ -117,6 +117,12 @@ details.bought summary{cursor:pointer;color:var(--muted);font-weight:600;margin-
 .member textarea{font:inherit;font-size:14px;width:100%;min-height:64px;resize:vertical;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 .pill.vot{background:var(--vote-soft);color:var(--vote)}
 .hot-n{font-family:var(--display);font-weight:700;font-size:22px;color:var(--vote);text-align:center;line-height:1.1}
+details.sec{border-top:1px solid var(--line);padding:14px 0}
+details.sec>summary{cursor:pointer;font-family:var(--display);font-weight:600;font-size:20px;list-style:none;display:flex;align-items:center;gap:10px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:"▸";color:var(--accent);font-size:16px;transition:transform .15s}
+details.sec[open]>summary::before{transform:rotate(90deg)}
+details.sec>.hint{margin:8px 0 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -169,7 +175,7 @@ details.bought summary{cursor:pointer;color:var(--muted);font-weight:600;margin-
           <h2>Ranking de candidatos</h2>
           <button class="btn small" id="export-votes" type="button">Descargar para Excel</button>
         </div>
-        <p class="hint" style="margin-top:4px">Cada persona puede votar por todos los juegos que quiera. El más votado va arriba.</p>
+        <p class="hint" style="margin-top:4px">Aquí están todos los juegos de las wishlists que la familia todavía no tiene, más los que se propongan. Cada juego suma 1 punto por cada wishlist en la que está y 1 punto por cada voto. El de más puntos va arriba.</p>
         <div class="cands" id="cands"><div class="empty">Cargando candidatos…</div></div>
         <details class="bought" id="bought-box" hidden>
           <summary>Ya comprados (<span id="bought-n">0</span>)</summary>
@@ -208,18 +214,24 @@ details.bought summary{cursor:pointer;color:var(--muted);font-weight:600;margin-
       <div style="min-width:0">
         <div id="mem-notice" class="notice" hidden></div>
         <div id="mem-sync"></div>
-        <h2>Lo que más quiere la familia</h2>
-        <p class="hint" style="margin-top:4px">Juegos que están en la wishlist de dos o más integrantes y que todavía no tienen. El número es cuántas personas lo quieren.</p>
-        <div class="cands" id="hot"></div>
-        <details class="bought" id="solo-box" hidden>
-          <summary>Deseados por una sola persona (<span id="solo-n">0</span>)</summary>
-          <div class="cands" id="solo"></div>
+        <details class="sec">
+          <summary>Lo que más quiere la familia</summary>
+          <p class="hint">Juegos que están en la wishlist de dos o más integrantes y que todavía no tienen. El número es cuántas personas lo quieren.</p>
+          <div class="cands" id="hot"></div>
+          <details class="bought" id="solo-box" hidden>
+            <summary>Deseados por una sola persona (<span id="solo-n">0</span>)</summary>
+            <div class="cands" id="solo"></div>
+          </details>
         </details>
-        <h2 style="margin-top:28px">Ya están en la familia (<span id="owned-n">0</span>)</h2>
-        <p class="hint" style="margin-top:4px">Juegos que alguien tiene en su wishlist pero que ya puede jugar desde la biblioteca familiar. No hace falta comprarlos.</p>
-        <div class="cands" id="owned-wl"></div>
-        <h2 style="margin-top:28px">Integrantes y sus wishlists</h2>
-        <div class="members" id="members"><div class="empty">Cargando integrantes…</div></div>
+        <details class="sec">
+          <summary>Ya están en la familia (<span id="owned-n">0</span>)</summary>
+          <p class="hint">Juegos que alguien tiene en su wishlist pero que ya puede jugar desde la biblioteca familiar. No hace falta comprarlos.</p>
+          <div class="cands" id="owned-wl"></div>
+        </details>
+        <details class="sec">
+          <summary>Integrantes y sus wishlists</summary>
+          <div class="members" id="members"><div class="empty">Cargando integrantes…</div></div>
+        </details>
       </div>
       <aside class="panel">
         <h2 style="font-size:17px">Agregar integrante</h2>
@@ -370,7 +382,7 @@ $("#who-form").addEventListener("submit", e=>e.preventDefault());
 $("#f-name").oninput = e => {
   const v=norm(e.target.value); const d=$("#f-dupe");
   if(v && LIBSET.has(v)){d.textContent="Ya está en la biblioteca"; d.hidden=false;}
-  else if(v && cands.some(c=>norm(c.name)===v)){d.textContent="Ya está en la votación"; d.hidden=false;}
+  else if(v && allCands().some(c=>norm(c.name)===v)){d.textContent="Ya está en la votación"; d.hidden=false;}
   else d.hidden=true;
 };
 
@@ -378,10 +390,21 @@ function tally(){
   const t={}; Object.entries(votes).forEach(([uid,v])=>Object.keys(v.picks||{}).forEach(cid=>{ if(v.picks[cid]) (t[cid] ||= []).push(uid); }));
   return t;
 }
+function wishMap(){ const m={}; (typeof wishIndex==="function" ? wishIndex() : []).forEach(w=>m[norm(w.name)]=w); return m; }
+/* candidatos reales + todos los juegos de las wishlists que no tiene la familia */
+function allCands(){
+  const wm=wishMap(); const seen=new Set();
+  const list=[];
+  cands.forEach(c=>{ const k=norm(c.name||""); seen.add(k); if(c.status==="descartado") return; list.push(Object.assign({}, c, {wish:(wm[k]&&wm[k].who)||[]})); });
+  Object.values(wm).forEach(w=>{ const k=norm(w.name); if(!k || seen.has(k) || LIBSET.has(k)) return;
+    list.push({id:"wl-"+k, name:w.name, genre:"", group:false, note:"", status:"pendiente", createdAt:0, virtual:true, wish:w.who}); });
+  return list;
+}
+function scoreOf(c, t){ return (c.wish||[]).length + ((t[c.id]||[]).length); }
 function renderCands(){
-  const t = tally();
-  const active = cands.filter(c=>c.status!=="comprado").sort((a,b)=>(t[b.id]?.length||0)-(t[a.id]?.length||0) || (a.createdAt||0)-(b.createdAt||0));
-  const done = cands.filter(c=>c.status==="comprado");
+  const t = tally(); const all=allCands();
+  const active = all.filter(c=>c.status!=="comprado").sort((a,b)=>scoreOf(b,t)-scoreOf(a,t) || (b.wish.length-a.wish.length) || (a.createdAt||0)-(b.createdAt||0) || a.name.localeCompare(b.name,"es"));
+  const done = all.filter(c=>c.status==="comprado");
   $("#cand-count").textContent = active.length;
   const box=$("#cands"); box.textContent="";
   if(!fs){ box.append(el("div","empty","La votación todavía no está configurada. Falta pegar los datos de Firebase en el archivo.")); return; }
@@ -390,10 +413,16 @@ function renderCands(){
     if(!cands.length){ const b=el("button","btn","Cargar las 16 sugerencias de Claude"); b.type="button"; b.onclick=seed; e.append(b); }
     box.append(e);
   }
-  const topVotes = active.length ? (t[active[0].id]?.length||0) : 0;
-  active.forEach((c,i)=>box.append(card(c, t[c.id]||[], i+1, topVotes>0 && (t[c.id]?.length||0)===topVotes)));
+  const top = active.length ? scoreOf(active[0],t) : 0;
+  active.forEach((c,i)=>box.append(card(c, t[c.id]||[], i+1, top>0 && scoreOf(c,t)===top)));
   const bb=$("#bought"); bb.textContent=""; $("#bought-box").hidden = !done.length; $("#bought-n").textContent=done.length;
   done.forEach(c=>bb.append(card(c, t[c.id]||[], null, false)));
+}
+function setStatus(c, status){
+  if(c.virtual){
+    return write(()=>fs.collection("candidates").doc(c.id).set({name:c.name, genre:"", group:false, note:"En la wishlist de "+c.wish.join(", "), status, createdAt:Date.now(), addedBy:myName||null}));
+  }
+  return write(()=>fs.collection("candidates").doc(c.id).update({status}));
 }
 function card(c, voters, rank, lead){
   const d=el("div","cand"+(lead?" lead":""));
@@ -401,19 +430,22 @@ function card(c, voters, rank, lead){
   const body=el("div"); body.style.minWidth="0";
   body.append(el("h3",null,c.name||"Sin nombre"));
   const meta=el("div","meta");
+  const pts=(c.wish||[]).length+voters.length;
+  if(rank!=null) meta.append(el("span","pill vot", pts+(pts===1?" punto":" puntos")));
   if(c.genre) meta.append(el("span","pill genre-p",c.genre));
   if(c.group) meta.append(el("span","pill grp","En grupo"));
   if(LIBSET.has(norm(c.name||""))) meta.append(el("span","pill warn","Ya está en la biblioteca"));
   if(c.status==="comprado") meta.append(el("span","pill own","Comprado"));
   body.append(meta);
   if(c.note) body.append(el("p","note",c.note));
+  if((c.wish||[]).length) body.append(el("div","who", "En la wishlist de: " + c.wish.join(", ")));
   if(voters.length){ body.append(el("div","who", "Votaron: " + voters.map(id=>(votes[id]&&votes[id].name)||id).join(", "))); }
   if(meId()){
     const a=el("div","actions");
     const toggle=el("button","linkish", c.status==="comprado" ? "Volver a la votación" : "Marcar como comprado"); toggle.type="button";
-    toggle.onclick=()=>write(()=>fs.collection("candidates").doc(c.id).update({status: c.status==="comprado" ? "pendiente" : "comprado"}));
+    toggle.onclick=()=>setStatus(c, c.status==="comprado" ? "pendiente" : "comprado");
     const del=el("button","linkish danger","Quitar"); del.type="button";
-    del.onclick=()=>{ if(del.dataset.arm){ write(()=>fs.collection("candidates").doc(c.id).delete()).then(()=>toast("Candidato quitado")); } else { del.dataset.arm="1"; del.textContent="¿Seguro? Toca otra vez para quitar"; setTimeout(()=>{del.dataset.arm=""; del.textContent="Quitar";},4000);} };
+    del.onclick=()=>{ if(del.dataset.arm){ setStatus(c,"descartado").then(()=>toast("Candidato quitado")); } else { del.dataset.arm="1"; del.textContent="¿Seguro? Toca otra vez para quitar"; setTimeout(()=>{del.dataset.arm=""; del.textContent="Quitar";},4000);} };
     a.append(toggle, del); body.append(a);
   }
   d.append(body);
@@ -430,7 +462,7 @@ function card(c, voters, rank, lead){
 let chain = Promise.resolve();
 function write(fn){ chain = chain.then(fn).catch(()=>toast("No se pudo guardar. Revisa tu conexión.")); return chain; }
 function toggleVote(cid){
-  const id=meId(); if(!id) return;
+  const id=meId(); if(!id || !cid) return;
   const picks = Object.assign({}, (votes[id]&&votes[id].picks)||{});
   if(picks[cid]) delete picks[cid]; else picks[cid]=true;
   votes[id] = {name:myName, picks}; renderCands();
@@ -442,7 +474,7 @@ function seed(){
 $("#add-form").addEventListener("submit", e=>{
   e.preventDefault(); const id=meId(); if(!fs || !id) return;
   const name=$("#f-name").value.trim(); if(!name) return;
-  if(cands.some(c=>norm(c.name)===norm(name))){ toast("Ese juego ya está en la votación"); return; }
+  if(allCands().some(c=>norm(c.name)===norm(name))){ toast("Ese juego ya está en la votación"); return; }
   const data={name, genre:$("#f-genre").value, group:$("#f-grp").checked, note:$("#f-note").value.trim(), status:"pendiente", createdAt:Date.now(), addedBy:myName};
   write(async ()=>{ const ref = await fs.collection("candidates").add(data);
     const picks=Object.assign({}, (votes[id]&&votes[id].picks)||{}, {[ref.id]:true}); votes[id]={name:myName,picks};
@@ -451,8 +483,8 @@ $("#add-form").addEventListener("submit", e=>{
 });
 $("#export-votes").onclick = ()=>{
   const t=tally();
-  const rows=cands.slice().sort((a,b)=>(t[b.id]?.length||0)-(t[a.id]?.length||0)).map(c=>[c.name,c.genre||"",c.group?"Sí":"No",t[c.id]?.length||0,(t[c.id]||[]).map(id=>(votes[id]&&votes[id].name)||id).join(", "),c.status==="comprado"?"Comprado":"Pendiente",c.note||""]);
-  offer("votacion-juegos.csv", csv([["Juego","Género","En grupo","Votos","Quién votó","Estado","Nota"],...rows]));
+  const rows=allCands().sort((a,b)=>scoreOf(b,t)-scoreOf(a,t)).map(c=>[c.name,scoreOf(c,t),(c.wish||[]).length,(c.wish||[]).join(", "),(t[c.id]||[]).length,(t[c.id]||[]).map(id=>(votes[id]&&votes[id].name)||id).join(", "),c.status==="comprado"?"Comprado":"Pendiente",c.genre||"",c.note||""]);
+  offer("votacion-juegos.csv", csv([["Juego","Puntos","Wishlists","En la wishlist de","Votos","Quién votó","Estado","Género","Nota"],...rows]));
 };
 
 
@@ -486,8 +518,7 @@ function memberCard(m, cs){
     const li=el("li"); li.append(el("span","t",g));
     const tags=el("span","tags");
     if(LIBSET.has(norm(g))) tags.append(el("span","pill own","Ya lo tienen"));
-    else if(cs.has(norm(g))) tags.append(el("span","pill vot","En votación"));
-    else { const p=el("button","linkish","Proponer"); p.type="button"; p.title="Agregar a la votación"; p.onclick=()=>proposeFromWishlist(g, [m.name]); tags.append(p); }
+    else tags.append(el("span","pill vot","En votación"));
     const x=el("button","x","×"); x.type="button"; x.setAttribute("aria-label","Quitar "+g+" de la wishlist"); x.onclick=()=>{ const next=wl.slice(); next.splice(i,1); saveWishlist(m, next); };
     tags.append(x); li.append(tags); ul.append(li);
   });
@@ -516,8 +547,7 @@ function wishRow(w, cs, owned){
   body.append(el("div","who",(owned ? "En la wishlist de: " : "Lo quieren: ")+w.who.join(", ")));
   d.append(body);
   if(owned) d.append(el("span","pill own","Ya lo tienen"));
-  else if(cs.has(norm(w.name))) d.append(el("span","pill vot","En votación"));
-  else { const b=el("button","btn small","Proponer"); b.type="button"; b.onclick=()=>proposeFromWishlist(w.name, w.who); d.append(b); }
+  else d.append(el("span","pill vot","En votación"));
   return d;
 }
 function renderHot(){
@@ -589,7 +619,7 @@ $("#mem-form").addEventListener("submit", e=>{
   firebase.initializeApp(FIREBASE_CONFIG); fs = firebase.firestore();
   refreshAccess();
   fs.collection("candidates").onSnapshot(s=>{ cands=s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderCands(); renderMembers(); }, ()=>notice("No se pudo leer la votación. Revisa las reglas de Firestore."));
-  fs.collection("members").onSnapshot(s=>{ members=s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderMembers(); }, ()=>{ $("#mem-notice").textContent="No se pudo leer la lista de integrantes. Revisa las reglas de Firestore."; $("#mem-notice").hidden=false; });
+  fs.collection("members").onSnapshot(s=>{ members=s.docs.map(d=>Object.assign({id:d.id}, d.data())); renderMembers(); renderCands(); }, ()=>{ $("#mem-notice").textContent="No se pudo leer la lista de integrantes. Revisa las reglas de Firestore."; $("#mem-notice").hidden=false; });
   fs.collection("votes").onSnapshot(s=>{ const v={}; s.docs.forEach(d=>v[d.id]=d.data()); votes=v; renderCands(); }, ()=>{});
 })();
 </script>
