@@ -123,6 +123,9 @@ details.sec>summary::-webkit-details-marker{display:none}
 details.sec>summary::before{content:"▸";color:var(--accent);font-size:16px;transition:transform .15s}
 details.sec[open]>summary::before{transform:rotate(90deg)}
 details.sec>.hint{margin:8px 0 0}
+.vsearch{position:relative;margin-top:12px}
+.vsearch svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.vsearch input{width:100%;padding-left:36px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -176,6 +179,11 @@ details.sec>.hint{margin:8px 0 0}
           <button class="btn small" id="export-votes" type="button">Descargar para Excel</button>
         </div>
         <p class="hint" style="margin-top:4px">Aquí están todos los juegos de las wishlists que la familia todavía no tiene, más los que se propongan. Cada juego suma 1 punto por cada wishlist en la que está y 1 punto por cada voto. El de más puntos va arriba.</p>
+        <div class="vsearch">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="search" id="vq" placeholder="Buscar un juego o una persona en la votación…" aria-label="Buscar en la votación" autocomplete="off">
+        </div>
+        <div class="shown" id="vshown"></div>
         <div class="cands" id="cands"><div class="empty">Cargando candidatos…</div></div>
         <details class="bought" id="bought-box" hidden>
           <summary>Ya comprados (<span id="bought-n">0</span>)</summary>
@@ -378,6 +386,7 @@ $("#f-me").addEventListener("change", e=>{
   if(meId()) toast("Votarás como " + myName);
 });
 $("#who-form").addEventListener("submit", e=>e.preventDefault());
+$("#vq").addEventListener("input", ()=>renderCands());
 
 $("#f-name").oninput = e => {
   const v=norm(e.target.value); const d=$("#f-dupe");
@@ -414,7 +423,12 @@ function renderCands(){
     box.append(e);
   }
   const top = active.length ? scoreOf(active[0],t) : 0;
-  active.forEach((c,i)=>box.append(card(c, t[c.id]||[], i+1, top>0 && scoreOf(c,t)===top)));
+  const q = norm($("#vq").value||"");
+  const match = c => !q || norm(c.name||"").includes(q) || (c.wish||[]).some(w=>norm(w).includes(q)) || (t[c.id]||[]).some(id=>norm((votes[id]&&votes[id].name)||id).includes(q));
+  const shown = active.map((c,i)=>[c,i]).filter(([c])=>match(c));
+  $("#vshown").textContent = q ? (shown.length ? `${shown.length} de ${active.length} candidatos` : "Ningún candidato coincide con la búsqueda") : "";
+  const rankOf = c => 1 + active.filter(x=>scoreOf(x,t) > scoreOf(c,t)).length;
+  shown.forEach(([c])=>box.append(card(c, t[c.id]||[], rankOf(c), top>0 && scoreOf(c,t)===top)));
   const bb=$("#bought"); bb.textContent=""; $("#bought-box").hidden = !done.length; $("#bought-n").textContent=done.length;
   done.forEach(c=>bb.append(card(c, t[c.id]||[], null, false)));
 }
